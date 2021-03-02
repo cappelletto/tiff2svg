@@ -1,0 +1,3 @@
+[submodule "SVG-writer"]
+	path = SVG-writer
+	url = git@github.com:cappelletto/SVG-writer.git
