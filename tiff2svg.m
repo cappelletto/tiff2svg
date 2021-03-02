@@ -1,107 +1,104 @@
 %% Pipeline structure
+function [retval] = tiff2svg(filename, cmap)
 
-% Read geoTIFF
+% Input argumets:
+% geoTIFF filename [required]
+% Canvas size [optional, auto mode]
+% Number of histogram bins [optional]
+% Colourmap [optional]
 
-% Extract range/stats/colourmap
+% Assign default value to input argument cmap (colourmap)
+if ~exist('cmap', 'var')
+    cmap = jet(256);
+end
 
-% Replace invalida data entries
+%% Read geoTIFF -> update Canvas size
+% Extract range/stats/colourmap (if available)
+[A,R] = geotiffread(filename);
 
-% Apply colourmap, convert 1ch to RGB
+close all
+%% Compute statistics
+img_stdev = std(A,0, 'all'); % compute non-biased stdev estimation
+img_min = min(A,[],'all');
+img_max = max(A,[],'all');
+img_avg = mean(A,'all','omitnan');
+img_med = median(A,'all','omitnan');
+img_kur = kurtosis(A,0,'all');
+img_skw = skewness(A,0,'all');
 
-% Generate img
+figure
+imshow(A,[]); % plot auto-stretch mode
+colormap(cmap) % use here choropleth/user defined colormap for better viz
 
-% Show image (for validation purposes)
+B = uint8(255*mat2gray(A)); % remap input range to [0,1] and then to [0,255]
+C = ind2rgb(B, cmap);
 
-% Save image to PNG
+figure 
+imshow(C);
 
-% Create SVG
+i = [0:1/255:1];
+img_cmap = flip([i;i;i]');
+figure
+imshow(img_cmap)
+colormap(cmap)
 
-% Insert PNG ref into SVG structure
-
-% Generate colourmap rect
-
-% Show colourmap for validation
-
-% Insert ColourMap rect into SVG
-
-% Compute geoTIFF histogram
-
-% Generate rect/Histogram group
-
-% Insert histogram into SVG
-
-% Export SVG
+retval = A;
+return
 
 
+% mapshow(A + min(A),R);
 
 
-% Example SVG file
+canvas_size = size(A);
 
-%% construct two sample polygons
-
-% xy pairs
-poly1 = [[350, 75];
-         [379,161];
-         [469,161];
-         [397,215];
-         [423,301];
-         [350,250];
-         [277,301];
-         [303,215];
-         [231,161];
-         [321,161]];
-poly2 = [[850, 75.0];
-         [958,137.5];
-         [958,262.5];
-         [850,325.0];
-         [742,262.6];
-         [742,137.5]];
-polygons = [polyshape(poly1), polyshape(poly2)];
-[polygons_xrange, polygons_yrange] = polygons.boundingbox;
-
+% Replace invalid data entries (NoData field -> NaN)
 % compute canvas size (2*_range(1) so we have the same padding L and R)
-canvas_width  = diff(polygons_xrange) + 2*polygons_xrange(1);
-canvas_height = diff(polygons_yrange) + 2*polygons_yrange(1);
+canvas_width  = canvas_size(1);
+canvas_height = canvas_size(2);
 
-%% create a background image
-
-im = zeros([3, 3, 3], 'uint8');
-im(:, :, 1) = [127, 127, 127;   0,   0,   0; 255, 255, 255]; % red
-im(:, :, 2) = [  0, 127, 255;   0, 127, 255;   0, 127, 255]; % green
-im(:, :, 3) = [  0, 127, 255; 127,   0, 127; 255, 127,   0]; % blue
+%% Generate background image
+image = A;
 
 % scale to canvas size
-background = imresize(im, [canvas_height, canvas_width]);
+background = imresize(image, [canvas_height, canvas_width]);
 
-%% use SVGWriter
+%% Show image (for validation purposes)
 
+%% Save image to PNG
+
+%% Create SVG-writer object
 % construct object and set parameters
 writer = SVGWriter([canvas_width, canvas_height]);
 writer.resolution = 1/50;
-
-writer.add_comment('Description');
-writer.add_description('2polygons');
 
 writer.add_comment('Canvas');
 writer.add_rectangle([1, writer.canvas_size(1)-1], [1, writer.canvas_size(2)-1], 'FillColor', 'none', 'StrokeColor', 'blue', 'StrokeWidth', 2);
 % sadly, some browsers might not show this. Inkscape does show the rectangle, though.
 
-% writer.add_comment('Background');
-% writer.add_image(background, [0, 0]);
+writer.add_comment('Background');
+writer.add_image(background, [0, 0]);
 
-bkg_filename = "image.png";
-writer.add_comment('Background-link');
-writer.add_imagefile(bkg_filename, [0, 0]);
+% Apply colourmap, convert 1ch to RGB. CHeck if user-defined CM was
+% supplied
 
-writer.add_comment('Outline');
-writer.add_rectangle(polygons_xrange, polygons_yrange, 'FillColor', 'none', 'StrokeColor', 'red', 'StrokeWidth', 1);
+%% Insert PNG ref into SVG structure
+% bkg_filename = "image.png";
+% writer.add_comment('Background-link');
+% writer.add_imagefile(bkg_filename, [0, 0]);
 
-writer.add_comment('Line');
-writer.add_line(polygons_xrange, polygons_yrange, 'FillColor', 'none', 'StrokeColor', 'yellow', 'StrokeWidth', 3);
+%% Generate colourmap rect
 
-writer.add_comment('Polygons');
-for poly = transpose(polygons(:))
-    writer.add_polygon(poly, 'FillColor', 'lime', 'StrokeColor', 'blue', 'StrokeWidth', 1);
-end
+%% Show colourmap for validation
 
+%% Insert ColourMap rect into SVG
+
+%% Compute geoTIFF histogram
+
+%% Generate rect/Histogram group
+
+%% Insert histogram into SVG
+
+%% Export SVG
 writer.write('example.svg');
+
+res = A;
