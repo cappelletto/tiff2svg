@@ -1,5 +1,6 @@
 %% Pipeline structure
-function [retval] = tiff2svg(filename, cmap, colorbar_width, val_range, num_bins)
+%% TODO: use Matlab parser for optional/positional arguments
+function [retval] = tiff2svg(filename, cmap, colorbar_width, val_range, num_bins, font_size)
 
 % Input argumets:
 % geoTIFF filename [required]
@@ -17,9 +18,14 @@ if ~exist('num_bins', 'var')
     num_bins = 5;
 end
 
+
 % Assign default value to input argument cmap (colourmap)
 if ~exist('val_range', 'var')
     val_range = [-1, 1];
+end
+
+if ~exist('font_size', 'var')
+    font_size = 8;  % default units: px
 end
 
 % Assign default value to input argument cmap (colourmap)
@@ -40,6 +46,10 @@ img_avg = mean(geoImage,'all','omitnan');
 img_med = median  (geoImage,'all','omitnan');
 img_kur = kurtosis(geoImage,0,'all');
 img_skw = skewness(geoImage,0,'all');
+
+if isempty(val_range)   % min-max range argument provided, but empty: autodetect from data
+    val_range = [img_min img_max];
+end
 
 % figure
 % imshow(A,[]); % plot auto-stretch mode
@@ -144,7 +154,8 @@ writer.close_group();
 r = abs(diff(val_range));
 bin_edges = [val_range(1) : (r/(num_bins)) : val_range(2)];
 [N] = histcounts (geoImage, bin_edges);
-N = N/max(N);   % normalize histogram
+maxN = max(N);  % we store a copy of the original max count value for the histogram legend
+N = N/maxN;   % normalize histogram
 %k=length(N)
 %bar (E(1:k),N/s);
 width = hist_size(1)/(num_bins);  % nominal width(max) of each bar 
@@ -174,13 +185,27 @@ writer.open_group('gCaptionColorbar');
    l = 4;
    y = colorbar_pos(2);
    x = colorbar_pos(1)-l;
-
+   wx = 2; % 2 extra pixels
+   % TODO: move to a function the calculation of text anchor position
+   % determine the text width before placing it.
+   
    writer.add_line([x x+l],[y y], 'StrokeColor', 'gray', 'StrokeWidth', 1.0);   % upper tic
+   w  = wx + font_size * (strlength(sprintf("%.2f",val_range(2)))/2);
+   writer.add_text(x - w, y, sprintf("%.2f",val_range(2)), 'FillColor', 'gray', 'FontSize', font_size);
+
    y = colorbar_pos(2) + colorbar_size(1)/2;
    writer.add_line([x x+l],[y y], 'StrokeColor', 'gray', 'StrokeWidth', 1.0);   % middle tic
+   % Add legend text (min/max range values)
+   w  = wx + font_size * (strlength(sprintf("%.2f",sum(val_range)/2.0))/2);
+   writer.add_text(x - w, y, sprintf("%.2f",sum(val_range)/2.0), 'FillColor', 'gray', 'FontSize', font_size);
+
    y = colorbar_pos(2) + colorbar_size(1);
    writer.add_line([x x+l],[y y], 'StrokeColor', 'gray', 'StrokeWidth', 1.0);   % lower tic
+   % Add legend text (min/max range values). Pad right
+   w  = wx + font_size * (strlength(sprintf("%.2f",val_range(1)))/2);
+   writer.add_text(x - w, y, sprintf("%.2f",val_range(1)), 'FillColor', 'gray', 'FontSize', font_size);
 
+   
 writer.close_group();
 
 %% Group for image caption
@@ -194,11 +219,21 @@ writer.open_group('gCaptionHistogram');
    y = hist_pos(2) + hist_size(1);  % I know, this is a mess (row/col-wise indexing)
    x = hist_pos(1);
 
+   rel_max = max(N)/sum(N); % get the proportion of max value for the horizontal scale
    writer.add_line([x x],[y-l y], 'StrokeColor', 'gray', 'StrokeWidth', 1.0, 'StrokeOpacity', 0.8, 'StrokeDashArray', [2 3]);   % upper tic
+   w  = wx + font_size * (strlength(sprintf("%.2f",0.00))/2);
+   writer.add_text(x, y + font_size, sprintf("%.2f",0.00), 'FillColor', 'gray', 'FontSize', font_size);
+
    x = hist_pos(1) + hist_size(2)/2;
    writer.add_line([x x],[y-l y], 'StrokeColor', 'gray', 'StrokeWidth', 1.0, 'StrokeOpacity', 0.8, 'StrokeDashArray', [2 3]);   % upper tic
+   w  = wx + font_size * (strlength(sprintf("%.2f",rel_max/2.0))/2);
+   writer.add_text(x - w/2, y + font_size, sprintf("%.2f",rel_max/2.0), 'FillColor', 'gray', 'FontSize', font_size);
+
    x = hist_pos(1) + hist_size(2);
    writer.add_line([x x],[y-l y], 'StrokeColor', 'gray', 'StrokeWidth', 1.0, 'StrokeOpacity', 0.8, 'StrokeDashArray', [2 3]);   % upper tic
+   w  = wx + font_size * (strlength(sprintf("%.2f",rel_max))/2);
+   writer.add_text(x - w, y + font_size, sprintf("%.2f",rel_max), 'FillColor', 'gray', 'FontSize', font_size);
+
 writer.close_group();
 
 writer.close_layer();
